@@ -11,6 +11,7 @@
  * Copyright: 2015, Kartik Visweswaran, Krajee.com
  * For more JQuery plugins visit http://plugins.krajee.com
  * For more Yii related demos visit http://demos.krajee.com
+ * test
  */
 (function ($) {
     "use strict";
