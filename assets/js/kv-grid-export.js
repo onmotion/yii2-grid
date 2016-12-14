@@ -11,10 +11,11 @@
  * Copyright: 2015, Kartik Visweswaran, Krajee.com
  * For more JQuery plugins visit http://plugins.krajee.com
  * For more Yii related demos visit http://demos.krajee.com
- * test
  */
 (function ($) {
     "use strict";
+    var $modal = $('#fileLink');
+    var modalCont = $modal.find('.modal-body');
     var replaceAll, isEmpty, popupDialog, slug, templates, GridExport, urn = "urn:schemas-microsoft-com:office:";
     replaceAll = function (str, from, to) {
         return str.split(from).join(to);
@@ -32,6 +33,39 @@
     slug = function (strText) {
         return strText.toLowerCase().replace(/[^\w ]+/g, '').replace(/ +/g, '-');
     };
+
+    function loadPhotos(){
+        var articuls = $('.articuls');
+        var artsArr = {};
+        articuls.each(function(i){
+            artsArr[i] = $(this).html();
+        });
+        $.ajax({
+            type:'post',
+            url: "/catalog/savephotos",
+            dataType: "text",
+            data: artsArr,
+            timeout: 180000,
+            beforeSend: function(){
+                $('#preloader').show();
+            },
+            success: function(resp){
+                var res = JSON.parse(resp);
+                $('#preloader').hide();
+                modalCont.append('Фото: ' + res + '\r\n');
+                $modal.modal({"show":true});
+            },
+            error: function(jqXHR, textStatus, errorThrown){
+                console.log(jqXHR);
+                console.log(textStatus);
+                console.log(errorThrown);
+                $('#preloader').hide();
+                modalCont.html('Ошибка: ' + textStatus + '\r\n');
+                $modal.modal({"show":true});
+            }
+        });
+    }
+
     //noinspection XmlUnusedNamespaceDeclaration
     templates = {
         html: '<!DOCTYPE html>' +
@@ -287,7 +321,39 @@
                 self.popup.focus();
                 self.setPopupAlert(self.messages.downloadProgress);
             }
-            self.$form.submit();
+
+            var url = document.location.href;
+
+            self.$form.submitxls = function (e){
+                var postData = $(this).serializeArray();
+                var formURL = '/gridview/export/downloadxls'
+                $.ajax({
+                    type: 'post',
+                    url: formURL,
+                    dataType: "text",
+                    data: postData,
+                    timeout: 180000,
+                    beforeSend: function () {
+                        //    $('#preloader').show();
+                    },
+                    success: function (resp) {
+                        var $modal = $('#fileLink');
+                        var modalContent = $modal.find('.modal-body');
+                        modalContent.html('Excel: ' + resp + '\r\n <br>');
+                        loadPhotos();
+                        return false;
+                    },
+                    error: function (jqXHR, textStatus, errorThrown) {
+                        console.log(jqXHR);
+                        console.log(textStatus);
+                        console.log(errorThrown);
+                    }
+                });
+            };
+            if((url.indexOf('catalog') + 1) && type == 'xls')       //только для каталога и выгрузки в excel
+                self.$form.submitxls();
+            else
+                self.$form.submit();
 
         },
         exportHTML: function () {
