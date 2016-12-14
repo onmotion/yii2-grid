@@ -59,6 +59,50 @@ class ExportController extends Controller
     }
 
     /**
+     * Download the exported file
+     *
+     * @return string
+     */
+    public function actionDownloadxls()
+    {
+        $request = Yii::$app->request;
+        $type = $request->post('export_filetype', 'html');
+        $name = $request->post('export_filename', Yii::t('kvgrid', 'export'));
+        $content = $request->post('export_content', Yii::t('kvgrid', 'No data found'));
+        $mime = $request->post('export_mime', 'text/plain');
+        $encoding = $request->post('export_encoding', 'utf-8');
+        $bom = $request->post('export_bom', true);
+        $config = $request->post('export_config', '{}');
+        if ($type == GridView::PDF) {
+            $config = Json::decode($config);
+            $this->generatePDF($content, "{$name}.pdf", $config);
+            /** @noinspection PhpInconsistentReturnPointsInspection */
+            return;
+        }  elseif ($type == GridView::HTML) {
+            $content = HtmlPurifier::process($content);
+        } elseif ($type == GridView::CSV || $type == GridView::TEXT) {
+            if ($encoding != 'utf-8') {
+                $content = mb_convert_encoding($content, $encoding, 'utf-8');
+            } elseif ($bom) {
+                $content = chr(239) . chr(187) . chr(191) . $content; // add BOM
+            }
+        }
+        $this->setHttpHeaders($type, $name, $mime, $encoding);
+
+        $username = Yii::$app->user->identity['username'];
+        if (!file_exists("fim/reports/".$username. "/")) {
+            mkdir("fim/reports/".$username. "/", 0777, true);
+        }
+        $name = "goods_report" . date('dmyHis') . ".xls";
+        $filename = "fim/reports/" . $username . '/' . $name;
+        file_put_contents($filename ,$content);
+        $stringData = "http://corp.skl-co.ru/".$filename;
+
+        echo "<a href='$stringData'>$name</a>";
+
+    }
+
+    /**
      * Generates the PDF file
      *
      * @param string $content the file content
