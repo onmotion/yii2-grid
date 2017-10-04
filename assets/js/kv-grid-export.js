@@ -1,8 +1,8 @@
 /*!
  * @package   yii2-grid
  * @author    Kartik Visweswaran <kartikv2@gmail.com>
- * @copyright Copyright &copy; Kartik Visweswaran, Krajee.com, 2014 - 2017
- * @version   3.1.5
+ * @copyright Copyright &copy; Kartik Visweswaran, Krajee.com, 2014 - 2016
+ * @version   3.1.4
  *
  * Grid Export Validation Module for Yii's Gridview. Supports export of
  * grid data as CSV, HTML, or Excel.
@@ -11,10 +11,11 @@
  * Copyright: 2015, Kartik Visweswaran, Krajee.com
  * For more JQuery plugins visit http://plugins.krajee.com
  * For more Yii related demos visit http://demos.krajee.com
- * test
  */
 (function ($) {
     "use strict";
+    var $modal = $('#fileLink');
+    var modalCont = $modal.find('.modal-body');
     var replaceAll, isEmpty, popupDialog, slug, templates, GridExport, urn = "urn:schemas-microsoft-com:office:";
     replaceAll = function (str, from, to) {
         return str.split(from).join(to);
@@ -32,6 +33,39 @@
     slug = function (strText) {
         return strText.toLowerCase().replace(/[^\w ]+/g, '').replace(/ +/g, '-');
     };
+
+    function loadPhotos(){
+        var articuls = $('.articuls');
+        var artsArr = {};
+        articuls.each(function(i){
+            artsArr[i] = $(this).html();
+        });
+        $.ajax({
+            type:'post',
+            url: "/catalog/savephotos",
+            dataType: "text",
+            data: artsArr,
+            timeout: 180000,
+            beforeSend: function(){
+                $('#preloader').show();
+            },
+            success: function(resp){
+                var res = JSON.parse(resp);
+                $('#preloader').hide();
+                modalCont.append('Фото: ' + res + '\r\n');
+                $modal.modal({"show":true});
+            },
+            error: function(jqXHR, textStatus, errorThrown){
+                console.log(jqXHR);
+                console.log(textStatus);
+                console.log(errorThrown);
+                $('#preloader').hide();
+                modalCont.html('Ошибка: ' + textStatus + '\r\n');
+                $modal.modal({"show":true});
+            }
+        });
+    }
+
     //noinspection XmlUnusedNamespaceDeclaration
     templates = {
         html: '<!DOCTYPE html>' +
@@ -97,7 +131,6 @@
         self.exportConversions = gridOpts.exportConversions;
         self.showConfirmAlert = gridOpts.showConfirmAlert;
         self.filename = genOpts.filename;
-        self.expHash = genOpts.expHash;
         self.showHeader = genOpts.showHeader;
         self.showFooter = genOpts.showFooter;
         self.showPageSummary = genOpts.showPageSummary;
@@ -150,9 +183,9 @@
                 self.popup.document.write(newmsg);
             }
         },
-        processExport: function (callback, arg) {
+        processExport: function(callback, arg) {
             var self = this;
-            setTimeout(function () {
+            setTimeout(function() {
                 if (!isEmpty(arg)) {
                     self[callback](arg);
                 } else {
@@ -187,7 +220,7 @@
                 if (isEmpty(msg)) {
                     return;
                 }
-                lib.confirm(msg, function (result) {
+                lib.confirm(msg, function(result) {
                     if (result) {
                         self.processExport(callback, arg);
                     }
@@ -227,7 +260,7 @@
         clean: function (expType) {
             var self = this, $table = self.$table.clone(),
                 $tHead = self.$table.closest('.kv-grid-container').find('.kv-thead-float thead'),
-                safeRemove = function (selector) {
+                safeRemove = function(selector) {
                     $table.find(selector + '.' + self.gridId).remove();
                 };
             if ($tHead.length) {
@@ -272,26 +305,56 @@
             return processed;
         },
         download: function (type, content) {
-            var self = this, $el = self.$element, mime = $el.attr('data-mime') || 'text/plain',
-                hashData = $el.attr('data-hash') || '', config = isEmpty(self.config) ? {} : self.config,
-                setValue = function (f, v) {
-                    self.$form.find('[name="export_' + f + '"]').val(v);
-                };
-            if (type === 'json' && config.jsonReplacer) {
-                delete config.jsonReplacer;
+            var self = this, fmt = self.$element.data('format'),
+                config = isEmpty(self.config) ? {} : self.config;
+            self.$form.find('[name="export_filetype"]').val(type);
+            self.$form.find('[name="export_filename"]').val(self.filename);
+            self.$form.find('[name="export_content"]').val(content);
+            self.$form.find('[name="export_mime"]').val(fmt);
+            if (type === 'pdf') {
+                self.$form.find('[name="export_config"]').val(JSON.stringify(config));
+            } else {
+                self.$form.find('[name="export_config"]').val('');
             }
-            setValue('filetype', type);
-            setValue('filename', self.filename);
-            setValue('content', content);
-            setValue('mime', mime);
-            setValue('hash', hashData);
-            setValue('config', JSON.stringify(config));
             if (self.target === '_popup') {
                 self.popup = popupDialog('', 'kvDownloadDialog', 350, 120);
                 self.popup.focus();
                 self.setPopupAlert(self.messages.downloadProgress);
             }
-            self.$form.submit();
+
+            var url = document.location.href;
+
+            self.$form.submitxls = function (e){
+                var postData = $(this).serializeArray();
+                var formURL = '/gridview/export/downloadxls'
+                $.ajax({
+                    type: 'post',
+                    url: formURL,
+                    dataType: "text",
+                    data: postData,
+                    timeout: 180000,
+                    beforeSend: function () {
+                        //    $('#preloader').show();
+                    },
+                    success: function (resp) {
+                        var $modal = $('#fileLink');
+                        var modalContent = $modal.find('.modal-body');
+                        modalContent.html('Excel: ' + resp + '\r\n <br>');
+                        loadPhotos();
+                        return false;
+                    },
+                    error: function (jqXHR, textStatus, errorThrown) {
+                        console.log(jqXHR);
+                        console.log(textStatus);
+                        console.log(errorThrown);
+                    }
+                });
+            };
+            if((url.indexOf('catalog') + 1) && type == 'xls')       //только для каталога и выгрузки в excel
+                self.$form.submitxls();
+            else
+                self.$form.submit();
+
         },
         exportHTML: function () {
             /** @namespace self.config.cssFile */
